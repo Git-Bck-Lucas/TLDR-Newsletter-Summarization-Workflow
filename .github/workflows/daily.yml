@@ -1,0 +1,44 @@
+name: Daily TLDR Digest
+
+on:
+  schedule:
+    # 05:00 UTC = 07:00 Berlin im Sommer (CEST), 06:00 im Winter (CET).
+    # Bewusst kein DST-Handling; siehe README.
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}   # erlaubt manuelles Auslösen zum Testen
+
+permissions:
+  contents: write         # nötig, um state.json zurück zu committen
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run digest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python -m tldr_digest.main
+
+      - name: Commit updated state
+        run: |
+          if ! git diff --quiet -- state.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add state.json
+            git commit -m "chore: update digest state [skip ci]"
+            git push
+          else
+            echo "state.json unverändert, nichts zu committen"
+          fi

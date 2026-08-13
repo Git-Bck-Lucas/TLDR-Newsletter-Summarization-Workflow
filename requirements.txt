@@ -1,0 +1,5 @@
+anthropic>=0.40
+requests>=2.32
+beautifulsoup4>=4.12
+pydantic>=2.7
+pydantic-settings>=2.3
