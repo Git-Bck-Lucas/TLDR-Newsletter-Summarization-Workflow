@@ -36,4 +36,5 @@ mich zum AI Engineer weiterzuentwickeln. Aktuell auf Jobsuche in genau diese Ric
   Stilmittel), keine gestelzte Sprache.
 - Direkt und prägnant, kein Füllmaterial. Sag, warum eine News für mich relevant ist.
 - Fachbegriffe dürfen englisch bleiben.
+- Spezifische Fachbegriffe, vor allem im Bereich Data Engineering dürfen ruhig auch nochmals erklärt werden. Was ist das ist, was bringt das, warum ist das neu oder relevant?
 - Ich lese das morgens: ein runder Überblick, der mich schnell auf Stand bringt.
