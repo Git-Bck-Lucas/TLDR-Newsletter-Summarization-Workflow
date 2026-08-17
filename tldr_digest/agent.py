@@ -97,11 +97,27 @@ def run(issues: list[Issue], settings: Settings) -> str:
         "Hier sind die heutigen TLDR-Items. Schreib daraus das deutsche HTML-Digest für "
         "Lucas.\n\n" + _format_issues(issues)
     )
-    messages: list[dict] = [{"role": "user", "content": user_message}]
+    # cache_control markiert einen Cache-Breakpoint: tools + system + diese Item-Nachricht
+    # sind über alle Calls dieses Laufs byte-identisch und werden ab dem 2. Call zu ~10%
+    # gelesen statt voll berechnet. Deshalb die Nachricht als Content-Block mit cache_control.
+    messages: list[dict] = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": user_message,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+        }
+    ]
 
     fetches_used = 0
-    total_in = 0
-    total_out = 0
+    total_in = 0          # ungecachte Input-Tokens (voller Preis)
+    total_out = 0         # Output-Tokens
+    total_cache_write = 0  # in den Cache geschrieben (~1,25x Input-Preis)
+    total_cache_read = 0   # aus dem Cache gelesen (~0,1x Input-Preis)
     while True:
         # Streaming, damit das (potenziell lange) Digest nicht in HTTP-Timeouts läuft;
         # get_final_message() liefert die vollständige Antwort wie bei create().
@@ -117,14 +133,22 @@ def run(issues: list[Issue], settings: Settings) -> str:
 
         total_in += response.usage.input_tokens
         total_out += response.usage.output_tokens
+        total_cache_write += response.usage.cache_creation_input_tokens or 0
+        total_cache_read += response.usage.cache_read_input_tokens or 0
 
         # Fertig: keine Tool-Aufrufe mehr -> letzte Antwort ist das Digest.
         if response.stop_reason != "tool_use":
             # Sonnet-5-Preis (Standard $3/$15 pro 1M; bis 31.08.2026 Intro $2/$10).
-            cost = total_in * 3 / 1e6 + total_out * 15 / 1e6
+            # Cache-Schreiben 1,25x, Cache-Lesen 0,1x des Input-Preises.
+            cost = (
+                total_in * 3
+                + total_cache_write * 3 * 1.25
+                + total_cache_read * 3 * 0.1
+                + total_out * 15
+            ) / 1e6
             logger.info(
-                "Tokens gesamt: input=%d, output=%d, fetches=%d (~$%.3f bei Standardpreis)",
-                total_in, total_out, fetches_used, cost,
+                "Tokens: input=%d cache_write=%d cache_read=%d output=%d, fetches=%d (~$%.3f)",
+                total_in, total_cache_write, total_cache_read, total_out, fetches_used, cost,
             )
             return "".join(b.text for b in response.content if b.type == "text").strip()
 
